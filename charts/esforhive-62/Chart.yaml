@@ -13,4 +13,4 @@ orig_name: elasticsearch
 sources:
 - https://www.elastic.co/products/elasticsearch
 - https://github.com/pires/kubernetes-elasticsearch-cluster
-version: 0.2.2
+version: 0.0.1
