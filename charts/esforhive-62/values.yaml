@@ -1,0 +1,233 @@
+image:
+  es:
+    repository: quay.io/pires/docker-elasticsearch-kubernetes
+    tag: 6.2.3
+    pullPolicy: Always
+  init:
+    repository: busybox
+    tag: latest
+    pullPolicy: IfNotPresent
+
+common:
+  # Defines the service type for all outward-facing (non-discovery) services.
+  # For minikube use NodePort otherwise use LoadBalancer
+  serviceType: LoadBalancer
+
+  env:
+    CLUSTER_NAME: "myesdb"
+
+    # Uncomment this if you get the "No up-and-running site-local (private)
+    # addresses" error.
+    # NETWORK_HOST: "_eth0_"
+
+  # If enabled, then the data and master nodes will be StatefulSets with
+  # associated persistent volume claims.
+  stateful:
+    enabled: true
+
+    # The PVC storage class that backs the persistent volume claims. On AWS
+    # "gp2" would be appropriate.
+    class: "fast"
+
+# Client/ingest nodes can execute pre-processing pipelines, composed of
+# one or more ingest processors. Depending on the type of operations performed
+# by the ingest processors and the required resources, it may make sense to
+# have dedicated ingest nodes, that will only perform this specific task.
+client:
+  # It isn't common to need more than 2 client nodes.
+  replicas: 2
+  antiAffinity: "soft"
+
+  # The amount of RAM allocated to the JVM heap. This should be set to the
+  # same value as client.resources.requests.memory, or you may see
+  # OutOfMemoryErrors on startup.
+  heapMemory: 1g
+
+  resources:
+    requests:
+      memory: 512Mi
+
+  env:
+    NODE_DATA: "false"
+    NODE_MASTER: "false"
+    NODE_INGEST: "true"
+    HTTP_ENABLE: "true"
+
+# Data nodes hold the shards that contain the documents you have indexed. Data
+# nodes handle data related operations like CRUD, search, and aggregations.
+# These operations are I/O-, memory-, and CPU-intensive. It is important to
+# monitor these resources and to add more data nodes if they are overloaded.
+#
+# The main benefit of having dedicated data nodes is the separation of the
+# master and data roles.
+data:
+  # This count will depend on your data and computation needs.
+  replicas: 2
+  antiAffinity: "soft"
+
+  # The amount of RAM allocated to the JVM heap. This should be set to the
+  # same value as data.resources.requests.memory, or you may see
+  # OutOfMemoryErrors on startup.
+  heapMemory: 1g
+
+  resources:
+    requests:
+      memory: 512Mi
+
+  env:
+    NODE_DATA: "true"
+    NODE_MASTER: "false"
+    NODE_INGEST: "false"
+    HTTP_ENABLE: "false"
+
+  # Determines the properties of the persistent volume claim associated with a
+  # data node StatefulSet that is created when the common.stateful.enabled
+  # attribute is true.
+  stateful:
+    # This is a default value, and will not be sufficient in a production
+    # system. You'll probably want to increase it.
+    size: 10Gi
+
+# The master node is responsible for lightweight cluster-wide actions such as
+# creating or deleting an index, tracking which nodes are part of the
+# cluster, and deciding which shards to allocate to which nodes. It is
+# important for cluster health to have a stable master node.
+master:
+  # Master replica count should be (#clients / 2) + 1, and generally at least 3.
+  replicas: 3
+  antiAffinity: "soft"
+
+  # The amount of RAM allocated to the JVM heap. This should be set to the
+  # same value as master.resources.requests.memory, or you may see
+  # OutOfMemoryErrors on startup.
+  heapMemory: 1g
+
+  resources:
+    requests:
+      memory: 512Mi
+
+  env:
+    NODE_DATA: "false"
+    NODE_MASTER: "true"
+    NODE_INGEST: "false"
+    HTTP_ENABLE: "false"
+
+    # The default value for this environment variable is 2, meaning a cluster
+    # will need a minimum of 2 master nodes to operate. If you have 3 masters
+    # and one dies, the cluster still works.
+    NUMBER_OF_MASTERS: "2"
+
+  # Determines the properties of the persistent volume claim associated with a
+  # data node StatefulSet that is created when the common.stateful.enabled
+  # attribute is true.
+  stateful:
+    # This is a default value, and will not be sufficient in a production
+    # system. You'll probably want to increase it.
+    size: 4Gi
+
+service:
+  httpPort: 9200
+  transportPort: 9300
+
+exporter:
+  ## number of exporter instances
+  ##
+  replicaCount: 1
+
+  ## restart policy for all containers
+  ##
+  restartPolicy: Always
+
+  image:
+    repository: justwatch/elasticsearch_exporter
+    tag: 1.0.2
+    pullPolicy: IfNotPresent
+
+  resources: {}
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+  service:
+    type: ClusterIP
+    httpPort: 9108
+    annotations: {"snappyflow/prometheus": "true"}
+
+  es:
+    ## If true, query stats for all nodes in the cluster, rather than just the
+    ## node we connect to.
+    ##
+    all: true
+
+    ## If true, query stats for all indices in the cluster.
+    ##
+    indices: true
+
+    ## Timeout for trying to get stats from Elasticsearch. (ex: 20s)
+    ##
+    timeout: 30s
+  web:
+    ## Path under which to expose metrics.
+    ##
+    path: /metrics
+
+#image_registry: 10.11.0.217:5000
+image_registry: 34.218.206.182:5000
+
+
+
+kubeplugins:
+  name: kube-plugins
+
+  replicaCount: 1
+
+  image:
+    # This chart is compatible with different images, please choose one
+    repository: maplelabs/kube-plugins
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 256m
+      memory: 512Mi
+  pluginserver_port: 9001
+  pluginserver_host: monitoring-snappyflow-metrics-kube-plugins.default.svc.cluster.local
+
+
+
+############################################
+###    Kibana related config             ###
+############################################
+kibana:
+  enabled: true
+  replicas: 1
+  image:
+    repository: docker.elastic.co/kibana/kibana-oss
+    tag: 6.2.3
+    pullPolicy: IfNotPresent
+  httpPort: 80
+  resources:
+    limits:
+      cpu: 1000m
+    requests:
+      cpu: 100m
+  env:
+    # XPACK_GRAPH_ENABLED: "false"
+    # XPACK_ML_ENABLED: "false"
+    # XPACK_REPORTING_ENABLED: "false"
+    # XPACK_SECURITY_ENABLED: "false"
+
+logger:
+  enabled: true
+  image: gcr.io/google-containers/fluentd-elasticsearch
+  imageTag: v2.0.4
+  imagePullPolicy: IfNotPresent
+  fluentd_server_host: logger-snappyflow-fluentd.default.svc.cluster.local
+  fluentd_server_port: "24224"
+

@@ -1,0 +1,15 @@
+{{- if .Values.logger.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "fullname" . }}-logger-conf
+  labels:
+    snappyflow/compname: esforhive
+    snappyflow/appname: 3tier-stage
+    app: {{ template "fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+data:
+{{ (.Files.Glob "logger_config/*").AsConfig | indent 2 }}
+{{- end }}

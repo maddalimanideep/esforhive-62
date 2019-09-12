@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "fullname" . }}-kubeplugins-conf
+  labels:
+    snappyflow/compname: esforhive
+    snappyflow/appname: 3tier-stage
+    app: {{ template "fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+data:
+  input.yaml: | 
+   - host: {{ template "fullname" . }}
+     port: "9200"
+     type: elasticsearch

@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "fullname" . }}-plugin
+  labels:
+    snappyflow/compname: esforhive
+    snappyflow/appname: 3tier-stage
+    app: {{ template "fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+    component: {{ template "fullname" . }}
+    role: kube-plugin
+spec:
+  replicas: {{ .Values.kubeplugins.replicaCount }}
+  selector:
+    matchLabels:
+      component: {{ template "fullname" . }}
+      role: kube-plugin
+  template:
+    metadata:
+      labels:
+        snappyflow/compname: esforhive
+        snappyflow/appname: 3tier-stage
+        release: "{{ .Release.Name }}"
+        component: {{ template "fullname" . }}
+        role: kube-plugin
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/es-kube-plugins-configmap.yaml") . | sha256sum }}
+    spec:
+      restartPolicy: {{ .Values.kubeplugins.restartPolicy }}
+      containers:
+        - name: "{{ .Chart.Name }}-kube-plugin"
+          image: "{{ .Values.image_registry }}/{{ .Values.kubeplugins.image.repository }}:{{ .Values.kubeplugins.image.tag }}"
+          imagePullPolicy: {{ .Values.kubeplugins.image.pullPolicy }}
+          command: ["python", "kube-plugin.py"]
+          env:
+          - name: PODNAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: DEEPINSIGHT_PLUGIN_SERVER_IP
+            value: "{{ .Values.kubeplugins.pluginserver_host }}"
+          - name: DEEPINSIGHT_PLUGIN_SERVER_PORT
+            value: "{{ .Values.kubeplugins.pluginserver_port }}"
+          - name: DEEPINSIGHT_APPLICATION_NAME
+            value: {{ .Release.Name }}
+          resources:
+{{ toYaml .Values.kubeplugins.resources | indent 12 }}
+          volumeMounts:
+          - name: {{ template "fullname" . }}-kubeplugins-conf
+            mountPath: /opt/config
+      volumes:
+        - name: {{ template "fullname" . }}-kubeplugins-conf
+          configMap:
+            name: {{ template "fullname" . }}-kubeplugins-conf

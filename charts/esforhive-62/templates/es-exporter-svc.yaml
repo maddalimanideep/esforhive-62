@@ -1,0 +1,27 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ template "fullname" . }}-exporter
+  labels:
+    snappyflow/compname: esforhive
+    snappyflow/appname: 3tier-stage
+    app: {{ template "fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+    component: {{ template "fullname" . }}
+    role: exporter
+    snappyflow/plugin: elasticsearch
+{{- if .Values.exporter.service.annotations }}
+  annotations:
+{{ toYaml .Values.exporter.service.annotations | indent 4 }}
+{{- end }}
+spec:
+  type: {{ .Values.exporter.service.type }}
+  ports:
+    - name: exporter
+      port: {{ .Values.exporter.service.httpPort }}
+      protocol: TCP
+  selector:
+    component: {{ template "fullname" . }}
+    role: exporter
